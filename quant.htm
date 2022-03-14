@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset='Cp1252'>
+  
+  <title>Result Data</title>
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  
+  <style>
+  * { 
+    margin: 0; 
+    padding: 0; 
+  }
+  body { 
+    font: 14px/1.4 Palatino, Serif; 
+  }
+  
+  /* 
+  Generic Styling, for Desktops/Laptops 
+  */
+  table { 
+    width: 100%; 
+    border-collapse: collapse; 
+  }
+  /* Zebra striping */
+  tr:nth-of-type(odd) { 
+    background: #eee; 
+  }
+  th { 
+    background: #333; 
+    color: white; 
+    font-weight: bold; 
+  }
+  td, th { 
+    padding: 6px; 
+    border: 1px solid #9B9B9B; 
+    text-align: left; 
+  }
+  @media 
+  only screen and (max-width: 760px),
+  (min-device-width: 768px) and (max-device-width: 1024px)  {
+    table, thead, tbody, th, td, tr { display: block; }
+    thead tr { position: absolute;top: -9999px;left: -9999px;}
+    tr { border: 1px solid #9B9B9B; }
+    td { border: none;border-bottom: 1px solid #9B9B9B; position: relative;padding-left: 50%; }
+    
+    td:before { position: absolute;top: 6px;left: 6px;width: 45%; padding-right: 10px; white-space: nowrap;}
+    
+    /*
+    Label the data
+    */
+td:nth-of-type(1):before { content: "CO_REGIME_PAGTO"; }
+td:nth-of-type(2):before { content: "NO_REGIME_PAGAMENTO"; }
+td:nth-of-type(3):before { content: "TOTAL"; }
+  }
+  
+  /* Smartphones (portrait and landscape) ----------- */
+  @media only screen
+  and (min-device-width : 320px)
+  and (max-device-width : 480px) {
+    body { 
+      padding: 0; 
+      margin: 0; 
+      width: 320px; }
+    }
+  
+  /* iPads (portrait and landscape) ----------- */
+  @media only screen and (min-device-width: 768px) and (max-device-width: 1024px) {
+    body { 
+      width: 495px; 
+    }
+  }
+  
+  </style>
+  <!--<![endif]-->
+<script type="text/javascript">
+
+function search(){
+  
+  var s = document.getElementById('search').value;
+
+  rows = document.getElementById('data').getElementsByTagName('TR');
+  for(var i=0;i<rows.length;i++){
+    if ( rows[i].textContent.indexOf(s)>0  || s.length==0 ) {
+	  rows[i].style.display ='';
+    } else {
+      rows[i].style.display ='none';
+    }
+  }
+}
+
+
+var timer;
+function delayedSearch() {
+	clearTimeout(timer);
+	console.log('delay-ing')
+    timer = setTimeout(function () {
+		console.log('delay-running')
+		search();
+    }, 500);
+  }</script>
+</head>
+
+<body>
+<div><input type="text" size="30" maxlength="1000" value="" id="search" onkeyup="delayedSearch();" /><input type="button" value="Go" onclick="lsearch();"/> </div>
+<table><thead><tr>	<th>CO_REGIME_PAGTO</th>
+	<th>NO_REGIME_PAGAMENTO</th>
+	<th>TOTAL</th>
+</tr></thead>
+<tbody id="data">
+
+	<tr>
+<td>001</td>
+<td>REGIME NORMAL</td>
+<td align="right">10028</td>
+	</tr>
+	<tr>
+<td>007</td>
+<td>SUBSTITUTO TRIBUTARIO DE OUTROS ESTADOS</td>
+<td align="right">364</td>
+	</tr>
+	<tr>
+<td>011</td>
+<td>PRODUTOR RURAL.</td>
+<td align="right">121378</td>
+	</tr>
+	<tr>
+<td>012</td>
+<td>ESTABELECIMENTO GRAFICO DE OUTROS ESTADOS</td>
+<td align="right">30</td>
+	</tr>
+	<tr>
+<td>015</td>
+<td>EMPRESAS DE CONSTRUÇAO CIVIL DE OUTROS ESTADOS</td>
+<td align="right">43</td>
+	</tr>
+	<tr>
+<td>016</td>
+<td>FRIGORIFICO NORMAL</td>
+<td align="right">7</td>
+	</tr>
+	<tr>
+<td>017</td>
+<td>SIMPLES NACIONAL</td>
+<td align="right">22957</td>
+	</tr>
+	<tr>
+<td>021</td>
+<td>SUBST TRIB CIMENTO E COMBUSTÍVEIS</td>
+<td align="right">46</td>
+	</tr>
+	<tr>
+<td>022</td>
+<td>SUBSTITUTO TRIBUTARIO COM TERMO DE ACORDO</td>
+<td align="right">12</td>
+	</tr>
+	<tr>
+<td>023</td>
+<td>LEILOEIRO</td>
+<td align="right">4</td>
+	</tr>
+	<tr>
+<td>026</td>
+<td>SUBST TRIB TELECOMUNICAÇÕES</td>
+<td align="right">8</td>
+	</tr>
+	<tr>
+<td>028</td>
+<td>MICRO EMPREENDEDOR INDIVIDUAL</td>
+<td align="right">58019</td>
+	</tr>
+	<tr>
+<td>029</td>
+<td>SUBSTITUTO TRIBUTARIO DE OUTRA UF (DIFAL) EC 87/2015</td>
+<td align="right">857</td>
+	</tr>
+	<tr>
+<td>030</td>
+<td>EMPRESA DE TELECOMUNICAÇÃO - CONV 113/04</td>
+<td align="right">8</td>
+	</tr>
+</tbody></table><!-- SQL:
+select p.co_regime_pagto, d.no_regime_pagamento ,count(p.co_cnpj_cpf) total
+from bi.dm_pessoa p
+left join BI.dm_regime_pagto_descricao d on p.co_regime_pagto = d.co_regime_pagamento
+where p.in_situacao = '001' -- somente contribuintes ativos
+group by p.co_regime_pagto, d.no_regime_pagamento
+order by 1--></body></html>
