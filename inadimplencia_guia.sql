@@ -10,8 +10,8 @@ t.va_principal_original,
 t.id_situacao
 from bi.fato_lanc_arrec t
 
-where t.id_cpf_cnpj = '32274639000232'
---where t.nu_guia_parcela IN ( '2020110121865600' )
+--where t.id_cpf_cnpj = '32274639000232'
+where t.nu_guia_parcela IN ( '2006160060420100' )
 and t.id_receita like '1%'
 and t.id_receita not like '18%'
 and t.id_situacao in ('00','01','02','03','05','07','08','10','11','18','19','69','78','80') -- tentativa de tirar os valores negativos
@@ -102,7 +102,11 @@ x.da_vencimento,
 
 
     
-case when y.nu_guia_redir is null then x.da_pagamento else y.da_quitacao end as da_quitacao,
+case when y.in_nivel_redir is null then 
+x.da_pagamento 
+else 
+max(y.da_quitacao) keep (dense_rank first order by y.da_quitacao) over (partition by x.nu_guia_parcela)
+end as da_quitacao,
 
 
 y.qtde_guias_origem --//over (partition by ),
@@ -134,17 +138,18 @@ tab_result as (
     select  t.*,
     
     NVL(case when t.in_nivel_redir = 1 then (t.va_principal_original/NULLIF(t.sum_redir,0) )
-    else (t.va_principal_original*t.acum_resid)/NULLIF(residuo,0)
-    end,0) as razao_resid_mult,
+    else 
+    case when t.residuo = 0 then 1 else (t.va_principal_original*t.acum_resid)/NULLIF(residuo,0)
+    end end,0) as razao_resid_mult,
     
     NVL(    
     case when t.in_nivel_redir is null then (case when t.id_situacao in ('00','02','03') then t.va_principal_original end)
     else
-    (t.va_pago    
+    case when t.residuo = 0 then t.va_principal_original else (t.va_pago    
     * 
     case when t.in_nivel_redir = 1 then (t.va_principal_original/NULLIF(t.sum_redir,0) )
-    else (t.va_principal_original*t.acum_resid)/NULLIF(residuo,0)
-    end) end, 0) as va_pago_apropriado
+    else ( t.va_principal_original*t.acum_resid)/NULLIF(residuo,0)
+    end) end end, 0) as va_pago_apropriado
     
     
     from tab_concat t 
@@ -163,7 +168,7 @@ tab_result as (
     k.da_vencimento,
     k.da_quitacao
     
-    from tab_result k WHERE K.NU_GUIA_PARCELA = '2021110045412400'
+    from tab_result k --WHERE K.NU_GUIA_PARCELA = '2021110045412400'
     group by
     k.va_principal_original,
     k.qtde_guias_origem,
