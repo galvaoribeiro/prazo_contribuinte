@@ -11,8 +11,8 @@ t.id_situacao
 from bi.fato_lanc_arrec t
 
 --where t.id_cpf_cnpj = '32274639000232'
-where t.nu_guia_parcela IN ( '2006160060420100' )
-and t.id_receita like '1%'
+--where t.nu_guia_parcela IN ( '2006160060420100' ) --2021110045412400
+where t.id_receita like '1%'
 and t.id_receita not like '18%'
 and t.id_situacao in ('00','01','02','03','05','07','08','10','11','18','19','69','78','80') -- tentativa de tirar os valores negativos
 
