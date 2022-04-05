@@ -1,4 +1,4 @@
-
+--18 minutos
 with tab_origem as (
 select
 t.id_cpf_cnpj,
@@ -11,11 +11,11 @@ t.id_situacao
 from bi.fato_lanc_arrec t
 
 --where t.id_cpf_cnpj = '32274639000232'
---where t.nu_guia_parcela IN ( '2006160060420100' ) --2021110045412400
+--where t.nu_guia_parcela IN ( '2006160060420100' )
 where t.id_receita like '1%'
 and t.id_receita not like '18%'
 and t.id_situacao in ('00','01','02','03','05','07','08','10','11','18','19','69','78','80') -- tentativa de tirar os valores negativos
-
+and t.nu_guia is not null
 ),
 
 tab_redir as (
@@ -27,32 +27,34 @@ tab_redir as (
     
     --round(r.va_principal_original/(sum(s.va_principal_original) over (partition by h.nu_guia_redir, h.nu_guia_parcela_origem)),5) razao,
     
-    sum(case when s.id_situacao in ('00','01','02','03','05','07','08','10','11','18','19','69','78','80') then s.va_principal_original end) over (partition by h.nu_guia_redir, h.nu_guia_parcela_origem) sum_redir,
+    sum(case when s.it_co_situacao_lancamento in ('00','01','02','03','05','07','08','10','11','18','19','69','78','80') then s.it_va_principal_original end) over (partition by h.nu_guia_redir, h.nu_guia_parcela_origem) sum_redir,
     --sum(s.va_principal_original) over (partition by h.nu_guia_redir, h.nu_guia_parcela_origem) - nvl(sum(case when s.id_situacao in ('00','02','03') then s.va_principal end) over (partition by h.nu_guia_redir, h.nu_guia_parcela_origem),0) resid_guia_redir,
-    nvl(sum(case when s.id_situacao in ('00','02','03') then s.va_principal_original end) over (partition by h.nu_guia_redir, h.nu_guia_parcela_origem),0) va_pago, 
+    nvl(sum(case when s.it_co_situacao_lancamento in ('00','02','03') then s.it_va_principal_original end) over (partition by h.nu_guia_redir, h.nu_guia_parcela_origem),0) va_pago, 
    
-   NVL(((sum(case when s.id_situacao in ('00','02','03') then s.va_principal_original end) over (partition by h.nu_guia_redir, h.nu_guia_parcela_origem))) /
-   NULLIF((sum(case when s.id_situacao in ('00','01','02','03','05','07','08','10','11','18','19','69','78','80') then s.va_principal_original end) over (partition by h.nu_guia_redir, h.nu_guia_parcela_origem)),0),0) as percentual_pagto,
+   NVL(((sum(case when s.it_co_situacao_lancamento in ('00','02','03') then s.it_va_principal_original end) over (partition by h.nu_guia_redir, h.nu_guia_parcela_origem))) /
+   NULLIF((sum(case when s.it_co_situacao_lancamento in ('00','01','02','03','05','07','08','10','11','18','19','69','78','80') then s.it_va_principal_original end) over (partition by h.nu_guia_redir, h.nu_guia_parcela_origem)),0),0) as percentual_pagto,
    
    
    --sum(s.va_principal_original) over (partition by h.nu_guia_parcela_origem order by h.in_nivel_redir ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW),
 
     --round(r.va_principal_original/(sum(r.va_principal_original) over (partition by h.nu_guia_redir)),2) razao,
-    count (distinct s.nu_guia_parcela) over (partition by s.nu_guia) nu_parcelas, -- adicionado depois
-    count ( distinct case when s.id_situacao in ('00','02','03') then s.nu_guia_parcela end) over (partition by s.nu_guia) nu_parcelas_pagas, -- adicionado depois
+    count (distinct s.it_nu_guia_lancamento||s.it_nu_parcela) over (partition by s.it_nu_guia_lancamento) nu_parcelas, -- adicionado depois
+    count ( distinct case when s.it_co_situacao_lancamento in ('00','02','03') then s.it_nu_guia_lancamento||s.it_nu_parcela end) over (partition by s.it_nu_guia_lancamento) nu_parcelas_pagas, -- adicionado depois
     h.nu_guia_redir, h.in_nivel_redir,
     count(distinct h.nu_guia_parcela_origem) over (partition by h.nu_guia_redir) qtde_guias_origem,
-    case when count (distinct s.nu_guia_parcela) over (partition by s.nu_guia) 
-    = count ( distinct case when s.id_situacao in ('00','02','03') then s.nu_guia_parcela end) over (partition by s.nu_guia)
+    case when count (distinct s.it_nu_guia_lancamento||s.it_nu_parcela) over (partition by s.it_nu_guia_lancamento) 
+    = count ( distinct case when s.it_co_situacao_lancamento in ('00','02','03') then s.it_nu_guia_lancamento||s.it_nu_parcela end) over (partition by s.it_nu_guia_lancamento)
     then 'SIM' else 'NAO' end as PARCELAMENTO_QUITADO,
     
-    case when count (distinct s.nu_guia_parcela) over (partition by s.nu_guia) 
-    = count ( distinct case when s.id_situacao in ('00','02','03') then s.nu_guia_parcela end) over (partition by s.nu_guia)
-    then max(s.da_pagamento) keep (dense_rank last order by s.da_pagamento) over (partition by s.nu_guia) end as da_quitacao
+
+    case when count (distinct s.it_nu_guia_lancamento||s.it_nu_parcela) over (partition by s.it_nu_guia_lancamento) 
+    = count ( distinct case when s.it_co_situacao_lancamento in ('00','02','03') then s.it_nu_guia_lancamento||s.it_nu_parcela end) over (partition by s.it_nu_guia_lancamento)
+    then max(to_date(case when s.it_da_pagamento_efetuado = '        ' then null else s.it_da_pagamento_efetuado end,'yyyymmdd') ) 
+    keep (dense_rank last order by to_date(case when s.it_da_pagamento_efetuado = '        ' then null else s.it_da_pagamento_efetuado end,'yyyymmdd')) over (partition by s.it_nu_guia_lancamento) end as da_quitacao
     
     from BI.dm_hist_redir_lanc h 
     left join bi.fato_lanc_arrec r on r.nu_guia_parcela = h.nu_guia_parcela_origem -- ORIGEM faz referência aos dados da origem
-    left join bi.fato_lanc_arrec s on s.nu_guia = h.nu_guia_redir -- REDIR  -- faz referência aos dados do redirecionamento
+    left join sitafe.sitafe_lancamento s on s.it_nu_guia_lancamento = h.nu_guia_redir -- REDIR  -- faz referência aos dados do redirecionamento
     where h.nu_guia_parcela_origem in (select f.nu_guia_parcela from tab_origem f)
      
 
@@ -176,14 +178,16 @@ tab_result as (
     k.id_cpf_cnpj,
     k.da_vencimento,
     k.da_quitacao
-    order by 3
+    --order by 3
     
 
 -- se atentar que algumas dívidas só entram no parcelamento depois (por exemplo, quando
--- já há um re(parcelamento) em curso... NÃO TRATEI ESSA PARTE.
+-- já há um re(parcelamento) em curso... NÃO TRATEI ESSA PARTE. RETIFICANDO: TRATADO 03/04/2022
 -- NESSE exemplo aqui, o valor da soma de pagos ficou menor que o valor original da dívida. Porque?
--- uma IDEIA: adicionar a coluna "número de parcelas" ao lado da coluna "nu_guia_redir"
+--RESOLVIDO EM 03/04/2022. EU ESTAVA UTILIZANDO VA_PRINCIPAL AO INVÉS DE VA_PRINCIPAL_ORIGINAL
+-- uma IDEIA: adicionar a coluna "número de parcelas" ao lado da coluna "nu_guia_redir". 
 ----- após adicionar a coluna "número de parcelas pagas" assim teríamos outro meio
------ indireto de aferir se foi paga toda a dívida.
+----- indireto de aferir se foi paga toda a dívida.FEITO EM 02/04/2022
+--- PROXIMA TAREFA: ACREDITO QUE ALGUNS BUGS AINDA PODEM ACONTECER. SERÁ NECESSÁRIO FAZER NOVOS TESTES.
 
 
