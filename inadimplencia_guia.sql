@@ -10,10 +10,11 @@ t.va_principal_original,
 t.id_situacao
 from bi.fato_lanc_arrec t
 
---where t.id_cpf_cnpj = '32274639000232'
+--where t.id_cpf_cnpj = '02839741000358'
 --where t.nu_guia_parcela IN ( '2006160060420100' )
 where t.id_receita like '1%'
 and t.id_receita not like '18%'
+and t.id_receita not like '17%'
 and t.id_situacao in ('00','01','02','03','05','07','08','10','11','18','19','69','78','80') -- tentativa de tirar os valores negativos
 and t.nu_guia is not null
 ),
@@ -38,17 +39,22 @@ tab_redir as (
    --sum(s.va_principal_original) over (partition by h.nu_guia_parcela_origem order by h.in_nivel_redir ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW),
 
     --round(r.va_principal_original/(sum(r.va_principal_original) over (partition by h.nu_guia_redir)),2) razao,
-    count (distinct s.it_nu_guia_lancamento||s.it_nu_parcela) over (partition by s.it_nu_guia_lancamento) nu_parcelas, -- adicionado depois
+    count (distinct case when s.it_co_situacao_lancamento in ('00','01','02','03','05','07','08','10','11','18','19','69','78','80') then s.it_nu_guia_lancamento||s.it_nu_parcela end) over (partition by s.it_nu_guia_lancamento) nu_parcelas, -- adicionado depois
     count ( distinct case when s.it_co_situacao_lancamento in ('00','02','03') then s.it_nu_guia_lancamento||s.it_nu_parcela end) over (partition by s.it_nu_guia_lancamento) nu_parcelas_pagas, -- adicionado depois
     h.nu_guia_redir, h.in_nivel_redir,
     count(distinct h.nu_guia_parcela_origem) over (partition by h.nu_guia_redir) qtde_guias_origem,
-    case when count (distinct s.it_nu_guia_lancamento||s.it_nu_parcela) over (partition by s.it_nu_guia_lancamento) 
+    count(distinct case when s.it_co_situacao_lancamento = '05' then h.nu_guia_redir end) over (partition by h.nu_guia_parcela_origem) qtde_parcelamentos,
+    
+    
+    case when count (distinct case when s.it_co_situacao_lancamento in ('00','01','02','03','05','07','08','10','11','18','19','69','78','80') then s.it_nu_guia_lancamento||s.it_nu_parcela end) over (partition by s.it_nu_guia_lancamento) 
     = count ( distinct case when s.it_co_situacao_lancamento in ('00','02','03') then s.it_nu_guia_lancamento||s.it_nu_parcela end) over (partition by s.it_nu_guia_lancamento)
     then 'SIM' else 'NAO' end as PARCELAMENTO_QUITADO,
     
 
-    case when count (distinct s.it_nu_guia_lancamento||s.it_nu_parcela) over (partition by s.it_nu_guia_lancamento) 
+    case when count (distinct case when s.it_co_situacao_lancamento in ('00','01','02','03','05','07','08','10','11','18','19','69','78','80') then s.it_nu_guia_lancamento||s.it_nu_parcela end) over (partition by s.it_nu_guia_lancamento) 
     = count ( distinct case when s.it_co_situacao_lancamento in ('00','02','03') then s.it_nu_guia_lancamento||s.it_nu_parcela end) over (partition by s.it_nu_guia_lancamento)
+    --a parte acima testa a igualdade = se a quantidade de guias parcelas na situação 00,02,03 é igual a quantidade de guias parcelas totais do redirecionamento
+    --se for, considera-se que o parcelamento foi quitado
     then max(to_date(case when s.it_da_pagamento_efetuado = '        ' then null else s.it_da_pagamento_efetuado end,'yyyymmdd') ) 
     keep (dense_rank last order by to_date(case when s.it_da_pagamento_efetuado = '        ' then null else s.it_da_pagamento_efetuado end,'yyyymmdd')) over (partition by s.it_nu_guia_lancamento) end as da_quitacao
     
@@ -56,6 +62,7 @@ tab_redir as (
     left join bi.fato_lanc_arrec r on r.nu_guia_parcela = h.nu_guia_parcela_origem -- ORIGEM faz referência aos dados da origem
     left join sitafe.sitafe_lancamento s on s.it_nu_guia_lancamento = h.nu_guia_redir -- REDIR  -- faz referência aos dados do redirecionamento
     where h.nu_guia_parcela_origem in (select f.nu_guia_parcela from tab_origem f)
+    and s.it_co_situacao_lancamento in ('00','01','02','03','05','07','08','10','11','18','19','69','78','80') -- codigos válidos
      
 
 ),
@@ -69,6 +76,7 @@ select distinct
 
 x.id_cpf_cnpj,
 x.nu_guia_parcela,
+x.id_receita,
 x.id_situacao,
 y.nu_guia_redir,
 y.in_nivel_redir,
@@ -89,6 +97,11 @@ round(exp(sum(ln(case when 1-y.percentual_pagto > 0 then 1-y.percentual_pagto en
     over (partition by x.nu_guia_parcela order by y.in_nivel_redir ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW )),5) 
     
         ) end as acum_resid,
+        
+        
+
+round(exp(sum(ln(case when 1-y.percentual_pagto > 0 then 1-y.percentual_pagto end))
+    over (partition by x.nu_guia_parcela order by y.in_nivel_redir ROWS UNBOUNDED PRECEDING )),5) as acum_resid_nivel_anterior,
 
 
 --y.acumulado,
@@ -111,8 +124,8 @@ max(y.da_quitacao) keep (dense_rank first order by y.da_quitacao) over (partitio
 end as da_quitacao,
 
 
-y.qtde_guias_origem --//over (partition by ),
-
+y.qtde_guias_origem, --//over (partition by ),
+y.qtde_parcelamentos
 /*
 case when y.nu_guia_redir is null and x.id_situacao in ('00','02','03') then x.va_principal_original  
      when y.nu_guia_redir is not null then 
@@ -139,6 +152,8 @@ tab_result as (
 
     select  t.*,
     
+    case when t.in_nivel_redir is null then 'NAO' else 'SIM' end as REDIRECIONADO,
+    
     NVL(case when t.in_nivel_redir = 1 then (t.va_principal_original/NULLIF(t.sum_redir,0) )
     else 
     case when t.residuo = 0 then 1 else (t.va_principal_original*t.acum_resid)/NULLIF(residuo,0)
@@ -147,7 +162,8 @@ tab_result as (
     NVL(    
     case when t.in_nivel_redir is null then (case when t.id_situacao in ('00','02','03') then t.va_principal_original end)
     else
-    case when t.residuo = 0 then t.va_principal_original else (t.va_pago    
+    case when t.residuo = 0 and t.in_nivel_redir <> 1 then t.va_principal_original * t.acum_resid_nivel_anterior
+    else (t.va_pago    
     * 
     case when t.in_nivel_redir = 1 then (t.va_principal_original/NULLIF(t.sum_redir,0) )
     else ( t.va_principal_original*t.acum_resid)/NULLIF(residuo,0)
@@ -163,18 +179,24 @@ tab_result as (
     
     k.id_cpf_cnpj,
     k.nu_guia_parcela,
+    k.id_receita,
     k.va_principal_original,
     round(sum(k.va_pago_apropriado),2) va_pago_apropriado,
     round((k.va_principal_original-sum(k.va_pago_apropriado))/ NULLIF(k.va_principal_original,0),4) as inad,
-    k.qtde_guias_origem,
+    k.redirecionado,
+    k.qtde_parcelamentos,
+    --k.qtde_guias_origem,
     k.da_vencimento,
     k.da_quitacao
     
     from tab_result k --WHERE K.NU_GUIA_PARCELA = '2021110045412400'
     group by
     k.va_principal_original,
-    k.qtde_guias_origem,
+    k.redirecionado,
+    k.qtde_parcelamentos,
+    --k.qtde_guias_origem,
     k.nu_guia_parcela,
+    k.id_receita,
     k.id_cpf_cnpj,
     k.da_vencimento,
     k.da_quitacao
